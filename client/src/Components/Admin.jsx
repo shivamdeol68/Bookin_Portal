@@ -1,0 +1,107 @@
+import React, { useEffect, useState } from 'react';
+import io from 'socket.io-client';
+import { useSelector } from 'react-redux';
+import AdminNavbar from '../admincomponent/AdminNavbar';
+import axios from 'axios';
+
+function Admin() {
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [UserData, setUserData] = useState([]);
+  const [activeTab, setActiveTab] = useState('Staffs');
+  
+  const adminId = useSelector(state => state.Admin.admin._id);
+  // const userIds = useSelector((state) => state.user.user.user[0]);
+  const staffIds = useSelector(state => state.Staffs.Staff); 
+  
+  useEffect(() => {
+    const fetchAdminData = async () => {
+        try {
+            const response = await axios.get(`http://localhost:3000/api/Admin-Data/${adminId}`);
+            setUserData(response.data.data.Carts.user);
+        } catch (error) {
+            console.log(error);
+        }
+    };
+    fetchAdminData();
+}, [adminId]);
+  const socket = io('http://localhost:3000');
+
+  useEffect(() => {
+    const storedMessages = localStorage.getItem('staffMessages');
+    if (storedMessages) {
+      setMessages(JSON.parse(storedMessages));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('staffMessages', JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    if (adminId) {
+      socket.on('admin message', (msg) => { // Listen for 'admin message' event
+        setMessages((prevMessages) => [...prevMessages, msg]);
+      });
+
+      return () => {
+        socket.off('admin message');
+      };
+    }
+  }, [adminId, socket]);
+
+  const sendMessage = () => {
+    const newMessage = { recipient: activeTab, message, sender: 'Admin' };
+    setMessages(prevMessages => [...prevMessages, newMessage]);
+    socket.emit('chat message', newMessage);
+    setMessage('');
+  };
+
+  return (
+  <>
+  <AdminNavbar/>
+  <div className="flex flex-col items-center justify-center mt-32">
+      <h1 className="text-3xl font-bold mb-4">Admin</h1>
+      {adminId && (
+        <div className="w-full max-w-md bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-bold mb-4">Admin Chat</h2>
+          <div className="mb-4">
+            {messages.map((msg, index) => (
+              <div key={index} className="mb-2">
+                <p><strong>{msg.sender}: </strong>{msg.message}</p>
+              </div>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="w-full border rounded-md p-2 mb-4"
+            placeholder="Type your message..."
+          />
+          <button onClick={sendMessage} className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:bg-blue-600">
+            Send
+          </button>
+          <div className="flex justify-between mt-4">
+            <button onClick={() => setActiveTab('admin')} className="flex-1 mr-2 bg-gray-300 hover:bg-gray-400 py-2 rounded-md focus:outline-none focus:bg-gray-400">
+              Admin
+            </button>
+              <button onClick={() => setActiveTab('user')} className="flex-1 mr-2 bg-gray-300 hover:bg-gray-400 py-2 rounded-md focus:outline-none focus:bg-gray-400">
+                User
+              </button>
+            {/* {UserData && (
+            )} */}
+            {staffIds && (  
+              <button onClick={() => setActiveTab('staff')} className="flex-1 bg-gray-300 hover:bg-gray-400 py-2 rounded-md focus:outline-none focus:bg-gray-400">
+                Staff
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </>
+  );
+}
+
+export default Admin;
